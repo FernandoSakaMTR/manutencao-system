@@ -131,7 +131,7 @@ class RequisicaoViewSet(viewsets.ModelViewSet):
         
         # Executor: em_andamento → concluido ou cancelado
         if user_role == 'executor':
-            return status_atual in ['pendente', 'em_andamento'] and novo_status in ['concluido', 'cancelado']
+            return status_atual == 'em_andamento' and novo_status in ['concluido', 'cancelado']
         
         return False
     
