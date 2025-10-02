@@ -24,6 +24,12 @@ def aprovador_user(db):
     PerfilUsuario.objects.create(user=user, role='aprovador')
     return user
 
+@pytest.fixture
+def executor_user(db):
+    user = User.objects.create_user(username='executor', password='test123', email='exec@test.com')
+    PerfilUsuario.objects.create(user=user, role='executor')
+    return user
+
 @pytest.mark.django_db
 class TestRequisicaoModel:
     def test_criar_requisicao_valida(self, solicitante_user):
@@ -56,7 +62,10 @@ class TestRequisicaoAPI:
             'prioridade': 'media',
         })
         assert response.status_code == 201
-        assert response.data['status'] == 'pendente'
+
+        # Verificar o status diretamente do banco de dados
+        latest_req = Requisicao.objects.latest('criado_em')
+        assert latest_req.status == 'pendente'
     
     def test_listar_requisicoes_apenas_proprias(self, api_client, solicitante_user):
         # Criar requisição
@@ -71,3 +80,19 @@ class TestRequisicaoAPI:
         response = api_client.get('/api/requisicoes/')
         assert response.status_code == 200
         assert len(response.data) >= 1
+
+    def test_executor_nao_pode_concluir_requisicao_pendente(self, api_client, solicitante_user, executor_user):
+        # Criar requisição com status 'pendente'
+        req = Requisicao.objects.create(
+            solicitante=solicitante_user,
+            titulo='Req pendente',
+            descricao='Esta requisição está pendente',
+            prioridade='alta'
+        )
+
+        api_client.force_authenticate(user=executor_user)
+        response = api_client.post(f'/api/requisicoes/{req.id}/atualizar_status/', {
+            'status': 'concluido',
+        })
+
+        assert response.status_code == 403, "Executor não deveria poder concluir uma requisição pendente"
